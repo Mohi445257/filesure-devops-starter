@@ -1,0 +1,38 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: filesure-worker
+  namespace: filesure
+spec:
+  pollingInterval: 30               # check MongoDB every 30s
+  maxReplicaCount: 10               # max 10 workers in parallel
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+
+  jobTargetRef:
+    parallelism: 1
+    completions: 1
+    template:
+      spec:
+        restartPolicy: Never
+        containers:
+        - name: worker
+          image: yasin445257/filesure-worker:latest
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: filesure-secrets   # Load all Mongo + Azure creds
+          env:                          # Explicitly expose MONGO_URI for KEDA + worker
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: filesure-secrets
+                  key: MONGO_URI
+
+  triggers:
+  - type: mongodb
+    metadata:
+      connectionStringFromEnv: MONGO_URI   # Will now resolve correctly
+      dbName: filesure
+      collection: jobs
+      query: '{ "status": "pending" }'

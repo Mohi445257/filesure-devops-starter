@@ -1,0 +1,17 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: filesure-api-scaler
+  namespace: filesure
+spec:
+  scaleTargetRef:
+    name: filesure-api   # Deployment name
+  minReplicaCount: 1
+  maxReplicaCount: 3     # keep small for free tier
+  pollingInterval: 30    # check every 30s
+  cooldownPeriod: 60     # wait 1 min before scaling down
+  triggers:
+  - type: cpu
+    metadata:
+      type: Utilization
+      value: "70"   # scale up if CPU > 70%

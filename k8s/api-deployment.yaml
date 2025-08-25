@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: filesure-api
+  namespace: filesure
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: filesure-api
+  template:
+    metadata:
+      labels:
+        app: filesure-api
+    spec:
+      containers:
+      - name: api
+        image: yasin445257/filesure-api:latest
+        imagePullPolicy: Always
+        envFrom:
+          - secretRef:
+              name: filesure-secrets    # Mongo + Azure creds
+        ports:
+          - containerPort: 5001
+        resources:
+          requests:
+            cpu: 100m        # request 0.1 vCPU
+            memory: 128Mi    # request 128 MB RAM
+          limits:
+            cpu: 250m        # cap at 0.25 vCPU
+            memory: 256Mi    # cap at 256 MB RAM
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: filesure-api-service
+  namespace: filesure
+spec:
+  type: LoadBalancer
+  selector:
+    app: filesure-api
+  ports:
+    - port: 5001
+      targetPort: 5001
+      nodePort: 32001

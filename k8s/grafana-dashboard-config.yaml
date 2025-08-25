@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: filesure
+data:
+  filesure-dashboard.json: |
+    {
+      "id": null,
+      "title": "Filesure API Dashboard",
+      "timezone": "browser",
+      "schemaVersion": 16,
+      "version": 1,
+      "refresh": "30s",
+      "panels": [
+        {
+          "type": "stat",
+          "title": "API UP",
+          "targets": [
+            {
+              "expr": "up{job=\"filesure-api\"}"
+            }
+          ],
+          "datasource": "Prometheus"
+        }
+      ]
+    }
