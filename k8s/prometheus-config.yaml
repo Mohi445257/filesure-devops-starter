@@ -18,3 +18,9 @@ data:
       - job_name: 'filesure-api'
         static_configs:
           - targets: ['filesure-api-service.filesure.svc.cluster.local:5001']
+
+      # Scrape Worker metrics (via Service on port 9100)
+      - job_name: 'filesure-worker'
+        scrape_interval: 15s
+        static_configs:
+          - targets: ['worker-service.filesure.svc.cluster.local:9100']

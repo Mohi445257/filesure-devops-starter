@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: filesure-api-service
+  namespace: filesure
+spec:
+  selector:
+    app: filesure-api   # Must match your Deployment labels
+  ports:
+    - name: http
+      port: 5001         # Exposed port
+      targetPort: 5001   # Container port
+  type: ClusterIP        # Internal-only by default

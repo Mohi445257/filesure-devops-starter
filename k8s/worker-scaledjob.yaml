@@ -4,35 +4,29 @@ metadata:
   name: filesure-worker
   namespace: filesure
 spec:
-  pollingInterval: 30               # check MongoDB every 30s
-  maxReplicaCount: 10               # max 10 workers in parallel
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 3
-
   jobTargetRef:
-    parallelism: 1
-    completions: 1
     template:
       spec:
-        restartPolicy: Never
         containers:
-        - name: worker
-          image: yasin445257/filesure-worker:latest
-          imagePullPolicy: Always
-          envFrom:
-            - secretRef:
-                name: filesure-secrets   # Load all Mongo + Azure creds
-          env:                          # Explicitly expose MONGO_URI for KEDA + worker
-            - name: MONGO_URI
-              valueFrom:
-                secretKeyRef:
+          - name: filesure-worker
+            image: yasin445257/filesure-worker:latest
+            envFrom:
+              - secretRef:
                   name: filesure-secrets
-                  key: MONGO_URI
-
+            ports:
+              - containerPort: 9100
+                name: metrics
+                protocol: TCP
+        restartPolicy: Never
+  pollingInterval: 30   # Check Mongo every 30s
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 5
+  maxReplicaCount: 10
   triggers:
-  - type: mongodb
-    metadata:
-      connectionStringFromEnv: MONGO_URI   # Will now resolve correctly
-      dbName: filesure
-      collection: jobs
-      query: '{ "status": "pending" }'
+    - type: mongodb
+      metadata:
+        connectionStringFromEnv: MONGO_URI
+        dbName: filesure
+        collection: jobs
+        query: '{"status":"pending"}'
+        value: "1"
