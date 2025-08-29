@@ -1,187 +1,144 @@
 import os
-import time
-import random
 import sys
-import threading
-from datetime import datetime, timedelta
+from datetime import datetime
 from pymongo import MongoClient
-from bson import ObjectId
-import logging
-from prometheus_client import Counter, Summary, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from azure.storage.blob import BlobServiceClient
-from flask import Flask
+from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+# ----------------------
+# Load environment
+# ----------------------
+MONGO_URI = os.getenv("MONGO_URI")
+AZURE_BLOB_CONN = os.getenv("AZURE_BLOB_CONN")
+AZURE_CONTAINER = os.getenv("AZURE_CONTAINER")
+PUSHGATEWAY_URL = os.getenv("PUSHGATEWAY_URL", "http://pushgateway:9091")
 
+if not all([MONGO_URI, AZURE_BLOB_CONN, AZURE_CONTAINER]):
+    print("❌ Missing required environment variables.", flush=True)
+    sys.exit(1)
 
-class DocumentDownloader:
-    def __init__(self):
-        # Mongo setup
-        self.mongo_uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
-        self.client = MongoClient(self.mongo_uri)
-        self.db = self.client["filesure"]
-        self.collection = self.db["jobs"]
-        self.docs_collection = self.db["documents"]
+# ----------------------
+# Setup Mongo & Blob
+# ----------------------
+client = MongoClient(MONGO_URI)
+db = client["filesure"]
+jobs_collection = db["jobs"]
+docs_collection = db["documents"]
 
-        # Azure Blob setup
-        self.blob_connection_string = os.environ.get("AZURE_BLOB_CONN")
-        self.blob_container = os.environ.get("AZURE_CONTAINER", "documents")
-        self.blob_service_client = None
-        if self.blob_connection_string:
+blob_service_client = BlobServiceClient.from_connection_string(AZURE_BLOB_CONN)
+container_client = blob_service_client.get_container_client(AZURE_CONTAINER)
+
+# Ensure container exists
+try:
+    container_client.create_container()
+except Exception:
+    pass  # already exists
+
+# ----------------------
+# Prometheus Metrics
+# ----------------------
+registry = CollectorRegistry()
+g_completed = Gauge("completed_jobs", "Number of successfully completed jobs", registry=registry)
+g_failed = Gauge("failed_jobs", "Number of failed jobs", registry=registry)
+g_docs_uploaded = Gauge("documents_uploaded_total", "Number of documents uploaded to Azure Blob", registry=registry)
+g_blob_failures = Gauge("blob_upload_failures_total", "Number of blob upload failures", registry=registry)
+
+def push_metrics(completed=0, failed=0, uploaded=0, blob_failed=0):
+    g_completed.set(completed)
+    g_failed.set(failed)
+    g_docs_uploaded.set(uploaded)
+    g_blob_failures.set(blob_failed)
+    push_to_gateway(PUSHGATEWAY_URL, job="filesure-worker", registry=registry)
+
+# ----------------------
+# Job Processing
+# ----------------------
+def process_job(job):
+    job_id = str(job["_id"])
+    print(f"⚙️ Processing job {job_id} for {job.get('companyName')}", flush=True)
+
+    uploaded_count = 0
+    failed_count = 0
+
+    try:
+        # Simulated list of "documents" (in reality you’d fetch from external API or disk)
+        documents = [
+            {"filename": f"{job_id}_doc1.txt", "content": f"Dummy content for job {job_id} - doc1"},
+            {"filename": f"{job_id}_doc2.txt", "content": f"Dummy content for job {job_id} - doc2"}
+        ]
+
+        for doc in documents:
             try:
-                self.blob_service_client = BlobServiceClient.from_connection_string(
-                    self.blob_connection_string
-                )
-                logger.info("Azure Blob Storage initialized")
+                # Upload to Azure Blob under path documents/<jobId>/<filename>
+                blob_name = f"documents/{job_id}/{doc['filename']}"
+                blob_client = container_client.get_blob_client(blob_name)
+                blob_client.upload_blob(doc["content"], overwrite=True)
+
+                # Insert into Mongo "documents" collection
+                docs_collection.insert_one({
+                    "jobId": job["_id"],
+                    "filename": doc["filename"],
+                    "blobPath": blob_name,
+                    "uploadStatus": "success",
+                    "uploadedAt": datetime.utcnow()
+                })
+
+                uploaded_count += 1
+                print(f"✅ Uploaded {doc['filename']} to {blob_name}", flush=True)
+
             except Exception as e:
-                logger.warning(f"Azure not configured: {e}")
+                failed_count += 1
+                print(f"❌ Failed to upload {doc['filename']}: {e}", flush=True)
 
-        # Prometheus metrics
-        self.jobs_processed = Counter("jobs_processed_total", "Total jobs processed", ["status"])
-        self.jobs_failed = Counter("jobs_failed_total", "Total jobs failed")
-        self.documents_downloaded = Counter("documents_downloaded_total", "Docs downloaded")
-        self.documents_uploaded = Counter("documents_uploaded_total", "Docs uploaded")
-        self.active_jobs = Gauge("active_jobs", "Jobs currently processing")
-        self.pending_jobs = Gauge("pending_jobs", "Pending jobs")
-        self.completed_jobs = Gauge("completed_jobs", "Completed jobs")
-        self.processing_time = Summary("job_processing_duration_seconds", "Job processing time")
-        self.download_batch_size = Histogram("download_batch_size", "Docs per batch")
+                docs_collection.insert_one({
+                    "jobId": job["_id"],
+                    "filename": doc["filename"],
+                    "blobPath": None,
+                    "uploadStatus": "failed",
+                    "error": str(e),
+                    "uploadedAt": datetime.utcnow()
+                })
 
-        logger.info("Downloader initialized")
-
-    def claim_job(self):
-        """Find a pending job and atomically claim it"""
-        cutoff_time = datetime.utcnow() - timedelta(minutes=10)
-        job = self.collection.find_one_and_update(
-            {
-                "jobStatus": "pending",
-                "$or": [{"lockedAt": {"$exists": False}}, {"lockedAt": {"$lt": cutoff_time}}],
-            },
-            {
-                "$set": {
-                    "jobStatus": "processing",
-                    "processingStages.documentDownload.status": "processing",
-                    "processingStages.documentDownload.lastUpdated": datetime.utcnow(),
-                    "updatedAt": datetime.utcnow(),
-                    "lockedBy": f"worker-{os.getpid()}-{int(time.time())}",
-                    "lockedAt": datetime.utcnow(),
-                }
-            },
-            return_document=True,
-        )
-        if job:
-            logger.info(f"Claimed job {job['_id']} for {job.get('companyName', 'Unknown')}")
-            self.active_jobs.inc()
-        return job
-
-    def _upload_document(self, job_id, doc_num, company_name, cin):
-        """Simulate uploading document to Azure"""
-        if not self.blob_service_client:
-            return None
-        try:
-            content = f"Document {doc_num} for {company_name} ({cin})"
-            blob_name = f"jobs/{job_id}/document_{doc_num}.txt"
-            blob_client = self.blob_service_client.get_blob_client(self.blob_container, blob_name)
-            blob_client.upload_blob(content, overwrite=True)
-            self.documents_uploaded.inc()
-            return blob_client.url
-        except Exception as e:
-            logger.error(f"Blob upload failed: {e}")
-            return None
-
-    def _save_document_metadata(self, job_id, doc_num, company_name, cin, blob_url):
-        """Save doc metadata to Mongo"""
-        self.docs_collection.insert_one(
-            {
-                "jobId": job_id,
-                "documentNumber": doc_num,
-                "companyName": company_name,
-                "cin": cin,
-                "fileName": f"document_{doc_num}.txt",
-                "blobUrl": blob_url,
-                "createdAt": datetime.utcnow(),
-            }
+        # Update job status
+        job_status = "completed" if failed_count == 0 else "partial_failed"
+        jobs_collection.update_one(
+            {"_id": job["_id"]},
+            {"$set": {
+                "jobStatus": job_status,
+                "updatedAt": datetime.utcnow(),
+                "progress": 100,
+                "totalDocuments": len(documents),
+                "uploadedDocuments": uploaded_count,
+                "failedDocuments": failed_count
+            }}
         )
 
-    def process_job(self, job):
-        job_id = job["_id"]
-        company = job.get("companyName", "Unknown")
-        cin = job.get("cin", "Unknown")
+        # Push metrics
+        push_metrics(completed=(1 if failed_count == 0 else 0),
+                     failed=(1 if failed_count > 0 else 0),
+                     uploaded=uploaded_count,
+                     blob_failed=failed_count)
 
-        logger.info(f"Processing job {job_id} for {company}")
-        start = time.time()
-        try:
-            total_documents = random.randint(10, 20)
-            self.collection.update_one(
-                {"_id": job_id},
-                {"$set": {"processingStages.documentDownload.totalDocuments": total_documents}},
-            )
+    except Exception as e:
+        print(f"❌ Job {job_id} failed entirely: {e}", flush=True)
+        jobs_collection.update_one(
+            {"_id": job["_id"]},
+            {"$set": {"jobStatus": "failed", "updatedAt": datetime.utcnow()}}
+        )
+        push_metrics(failed=1, blob_failed=1)
 
-            for i in range(total_documents):
-                time.sleep(0.5)  # simulate download
-                self.documents_downloaded.inc()
-                blob_url = self._upload_document(job_id, i + 1, company, cin)
-                self._save_document_metadata(job_id, i + 1, company, cin, blob_url)
-
-            self.collection.update_one(
-                {"_id": job_id},
-                {
-                    "$set": {
-                        "jobStatus": "completed",
-                        "processingStages.documentDownload.status": "completed",
-                        "updatedAt": datetime.utcnow(),
-                    },
-                    "$unset": {"lockedBy": "", "lockedAt": ""},
-                },
-            )
-            self.jobs_processed.labels(status="completed").inc()
-            self.completed_jobs.inc()
-            logger.info(f"Job {job_id} completed")
-        except Exception as e:
-            logger.error(f"Job {job_id} failed: {e}")
-            self.collection.update_one(
-                {"_id": job_id},
-                {
-                    "$set": {
-                        "jobStatus": "failed",
-                        "processingStages.documentDownload.status": "failed",
-                        "updatedAt": datetime.utcnow(),
-                    },
-                    "$unset": {"lockedBy": "", "lockedAt": ""},
-                },
-            )
-            self.jobs_failed.inc()
-        finally:
-            self.active_jobs.dec()
-            self.processing_time.observe(time.time() - start)
-
-    def run(self):
-        job = self.claim_job()
-        if not job:
-            logger.info("No pending jobs. Exiting.")
-            sys.exit(0)
-        self.process_job(job)
-
-
-# Flask metrics server
-app = Flask(__name__)
-
-
-@app.route("/metrics")
-def metrics():
-    return generate_latest(), 200, {"Content-Type": CONTENT_TYPE_LATEST}
-
-
-def start_metrics_server():
-    app.run(host="0.0.0.0", port=9100)
-
-
+# ----------------------
+# Main Worker Logic
+# ----------------------
 if __name__ == "__main__":
-    threading.Thread(target=start_metrics_server, daemon=True).start()
-    downloader = DocumentDownloader()
-    downloader.run()
+    job = jobs_collection.find_one_and_update(
+        {"jobStatus": "pending"},
+        {"$set": {"jobStatus": "in_progress", "updatedAt": datetime.utcnow()}}
+    )
+
+    if not job:
+        print("ℹ️ No pending jobs found, exiting.", flush=True)
+        sys.exit(0)
+
+    process_job(job)
+    sys.exit(0)

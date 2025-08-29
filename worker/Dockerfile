@@ -1,12 +1,14 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
+# Set workdir
 WORKDIR /app
 
+# Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Copy app code
+COPY downloader.py .
 
-EXPOSE 9100
-
+# Run worker
 CMD ["python", "downloader.py"]

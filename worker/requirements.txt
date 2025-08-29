@@ -1,4 +1,6 @@
-flask
-prometheus_client
-pymongo
-azure-storage-blob
+flask==2.3.2
+prometheus_client==0.17.1
+pymongo==4.5.0
+azure-core==1.29.4
+azure-storage-blob==12.19.1
+requests==2.31.0
