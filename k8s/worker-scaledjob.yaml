@@ -1,44 +1,80 @@
 apiVersion: keda.sh/v1alpha1
 kind: ScaledJob
 metadata:
-  name: filesure-worker
+  name: filesure-worker-scaler
   namespace: filesure
 spec:
-  pollingInterval: 10
-  maxReplicaCount: 10
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 1
+  pollingInterval: 30                  # check every 30s for pending jobs
+  maxReplicaCount: 10                  # max workers to run in parallel
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 5
 
   jobTargetRef:
     parallelism: 1
     completions: 1
-    backoffLimit: 0
-    ttlSecondsAfterFinished: 60
+    backoffLimit: 2
     template:
+      metadata:
+        labels:
+          app: filesure-worker
       spec:
         restartPolicy: Never
+        imagePullSecrets:
+        - name: dockerhub-secret
         containers:
-          - name: worker
-            image: yasin445257/filesure-worker:latest
-            env:
-              - name: MONGO_URI
-                valueFrom:
-                  secretKeyRef:
-                    name: filesure-secrets
-                    key: MONGO_URI
-              - name: AZURE_BLOB_CONN
-                valueFrom:
-                  secretKeyRef:
-                    name: filesure-secrets
-                    key: AZURE_BLOB_CONN
-              - name: AZURE_CONTAINER
-                value: "documents"
+        - name: worker
+          image: yasin445257/filesure-worker:latest
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 5002
+          env:
+          - name: PROMETHEUS_METRICS
+            value: "true"
+          - name: PYTHONUNBUFFERED
+            value: "1"
+          - name: MONGO_URI
+            valueFrom:
+              secretKeyRef:
+                name: filesure-secrets
+                key: MONGO_URI
+          - name: AZURE_STORAGE_ACCOUNT
+            valueFrom:
+              secretKeyRef:
+                name: filesure-secrets
+                key: AZURE_STORAGE_ACCOUNT
+          - name: AZURE_STORAGE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: filesure-secrets
+                key: AZURE_STORAGE_KEY
+          - name: AZURE_CONTAINER
+            valueFrom:
+              secretKeyRef:
+                name: filesure-secrets
+                key: AZURE_CONTAINER_NAME
+          - name: AZURE_BLOB_CONN
+            valueFrom:
+              secretKeyRef:
+                name: filesure-secrets
+                key: AZURE_BLOB_CONN
 
   triggers:
-    - type: mongodb
-      metadata:
-        connectionStringFromEnv: MONGO_URI
-        dbName: filesure
-        collection: jobs
-        query: '{ "jobStatus": "pending" }'
-        queryValue: "1"
+  - type: mongodb
+    metadata:
+      dbName: filesure
+      collection: jobs
+      query: '{"jobStatus":"pending"}'
+      queryValue: "1"
+    authenticationRef:
+      name: keda-mongo-auth
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-mongo-auth
+  namespace: filesure
+spec:
+  secretTargetRef:
+  - parameter: connectionString
+    name: filesure-secrets
+    key: MONGO_URI
