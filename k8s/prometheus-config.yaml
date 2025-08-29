@@ -9,18 +9,20 @@ data:
       scrape_interval: 15s
 
     scrape_configs:
-      # Scrape Prometheus itself
-      - job_name: 'prometheus'
-        static_configs:
-          - targets: ['localhost:9090']
-
-      # Scrape Filesure API (always running)
+      # Scrape the API service
       - job_name: 'filesure-api'
+        metrics_path: /metrics
         static_configs:
-          - targets: ['filesure-api-service.filesure.svc.cluster.local:5001']
+          - targets: ['filesure-api-service:5001']
 
-      # Scrape Worker metrics (via Service on port 9100)
+      # Scrape the Worker service (if at least one pod is running)
       - job_name: 'filesure-worker'
-        scrape_interval: 15s
+        metrics_path: /metrics
         static_configs:
-          - targets: ['worker-service.filesure.svc.cluster.local:9100']
+          - targets: ['filesure-worker-service:9100']
+
+      # Scrape Pushgateway (so even short-lived worker jobs are captured)
+      - job_name: 'pushgateway'
+        honor_labels: true
+        static_configs:
+          - targets: ['pushgateway:9091']

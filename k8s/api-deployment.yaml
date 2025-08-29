@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: filesure-api
-          image: yasin445257filesure-api:latest
+          image: yasin445257/filesure-api:latest
           ports:
             - containerPort: 5001
               name: http

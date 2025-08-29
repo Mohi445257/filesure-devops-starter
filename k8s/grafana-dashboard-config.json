@@ -1,0 +1,190 @@
+{
+  "id": null,
+  "title": "Filesure Monitoring Dashboard",
+  "tags": ["filesure", "monitoring", "assignment"],
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 3,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "row",
+      "title": "📊 Overview KPIs",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }
+    },
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Jobs Created",
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum(jobs_created_total)", "instant": true } ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "value"
+      },
+      "fieldConfig": { "defaults": { "decimals": 0 } },
+      "gridPos": { "x": 0, "y": 1, "w": 4, "h": 3 }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Jobs Processed",
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum(jobs_processed_total)", "instant": true } ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "value"
+      },
+      "fieldConfig": { "defaults": { "decimals": 0 } },
+      "gridPos": { "x": 4, "y": 1, "w": 4, "h": 3 }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Pending Jobs",
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum(pending_jobs)", "instant": true } ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "value"
+      },
+      "fieldConfig": { "defaults": { "decimals": 0 } },
+      "gridPos": { "x": 8, "y": 1, "w": 4, "h": 3 }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Completed Jobs",
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum(completed_jobs)", "instant": true } ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "value"
+      },
+      "fieldConfig": { "defaults": { "decimals": 0 } },
+      "gridPos": { "x": 12, "y": 1, "w": 4, "h": 3 }
+    },
+    {
+      "id": 5,
+      "type": "gauge",
+      "title": "Job Progress %",
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "avg(job_progress_percent)", "instant": true } ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 50 },
+              { "color": "green", "value": 80 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "x": 16, "y": 1, "w": 8, "h": 3 }
+    },
+
+    { "type": "row", "title": "📈 Job Trends", "collapsed": false, "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 } },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Jobs Created vs Processed",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "sum(jobs_created_total)", "legendFormat": "Created" },
+        { "expr": "sum(jobs_processed_total)", "legendFormat": "Processed" }
+      ],
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 6 }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Failed Jobs",
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum(jobs_failed_total)", "legendFormat": "Failed" } ],
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 6 }
+    },
+
+    { "type": "row", "title": "⚙️ Worker & Scaling", "collapsed": false, "gridPos": { "x": 0, "y": 12, "w": 24, "h": 1 } },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Worker Pods Status",
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "up{job=\"filesure-worker\"}", "legendFormat": "{{pod}}" } ],
+      "gridPos": { "x": 0, "y": 13, "w": 12, "h": 6 }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Scaling Activity",
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "kube_job_status_start_time{job_name=\"filesure-worker-scaler\"}" } ],
+      "gridPos": { "x": 12, "y": 13, "w": 12, "h": 6 }
+    },
+
+    { "type": "row", "title": "📦 Uploads", "collapsed": false, "gridPos": { "x": 0, "y": 19, "w": 24, "h": 1 } },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Documents Uploaded",
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum(documents_uploaded_total)" } ],
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 6 }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Blob Upload Failures",
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum(blob_upload_failures_total)" } ],
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 6 }
+    },
+
+    { "type": "row", "title": "🚨 Failures & Errors", "collapsed": false, "gridPos": { "x": 0, "y": 26, "w": 24, "h": 1 } },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Failed Jobs Breakdown",
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "sum(jobs_failed_total)", "instant": true } ],
+      "gridPos": { "x": 0, "y": 27, "w": 12, "h": 6 }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Errors Over Time",
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "rate(jobs_failed_total[5m])", "legendFormat": "Failure Rate" } ],
+      "gridPos": { "x": 12, "y": 27, "w": 12, "h": 6 }
+    },
+
+    { "type": "row", "title": "🔍 Advanced Metrics", "collapsed": true, "gridPos": { "x": 0, "y": 33, "w": 24, "h": 1 } },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Pushgateway Scrapes",
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "up{job=\"pushgateway\"}" } ],
+      "gridPos": { "x": 0, "y": 34, "w": 12, "h": 6 }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Prometheus API Scrape",
+      "datasource": "Prometheus",
+      "targets": [ { "expr": "up{job=\"filesure-api\"}" } ],
+      "gridPos": { "x": 12, "y": 34, "w": 12, "h": 6 }
+    }
+  ]
+}

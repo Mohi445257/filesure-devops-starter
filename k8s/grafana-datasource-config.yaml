@@ -1,16 +1,14 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: grafana-datasources
+  name: grafana-datasource-config
   namespace: filesure
-  labels:
-    grafana_datasource: "1"
 data:
-  prometheus-datasource.yaml: |
+  datasource.yaml: |
     apiVersion: 1
     datasources:
-    - name: Prometheus
-      type: prometheus
-      access: proxy
-      url: http://prometheus-service.filesure.svc.cluster.local:9090
-      isDefault: true
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-service.filesure.svc.cluster.local:9090
+        isDefault: true

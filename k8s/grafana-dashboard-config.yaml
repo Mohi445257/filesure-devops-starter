@@ -1,27 +1,109 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: grafana-dashboards
+  name: grafana-dashboard-config
   namespace: filesure
+  labels:
+    grafana_dashboard: "1"
 data:
-  filesure-dashboard.json: |
+  grafana-dashboard-config.json: |
     {
       "id": null,
-      "title": "Filesure API Dashboard",
+      "uid": "filesure-monitor",
+      "title": "Filesure Monitoring",
       "timezone": "browser",
-      "schemaVersion": 16,
+      "schemaVersion": 36,
       "version": 1,
-      "refresh": "30s",
       "panels": [
         {
           "type": "stat",
-          "title": "API UP",
-          "targets": [
-            {
-              "expr": "up{job=\"filesure-api\"}"
-            }
-          ],
-          "datasource": "Prometheus"
+          "title": "Jobs Created",
+          "targets": [{ "expr": "jobs_created_total" }],
+          "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 }
+        },
+        {
+          "type": "stat",
+          "title": "Jobs Processed",
+          "targets": [{ "expr": "jobs_processed_total" }],
+          "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 }
+        },
+        {
+          "type": "stat",
+          "title": "Jobs Failed",
+          "targets": [{ "expr": "jobs_failed_total" }],
+          "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 }
+        },
+        {
+          "type": "stat",
+          "title": "Documents Downloaded",
+          "targets": [{ "expr": "documents_downloaded_total" }],
+          "gridPos": { "x": 0, "y": 4, "w": 6, "h": 4 }
+        },
+        {
+          "type": "stat",
+          "title": "Documents Uploaded",
+          "targets": [{ "expr": "documents_uploaded_total" }],
+          "gridPos": { "x": 6, "y": 4, "w": 6, "h": 4 }
+        },
+        {
+          "type": "stat",
+          "title": "Retries",
+          "targets": [{ "expr": "worker_retries_total" }],
+          "gridPos": { "x": 12, "y": 4, "w": 6, "h": 4 }
+        },
+        {
+          "type": "stat",
+          "title": "Active Workers",
+          "targets": [{ "expr": "active_workers" }],
+          "gridPos": { "x": 0, "y": 8, "w": 6, "h": 4 }
+        },
+        {
+          "type": "stat",
+          "title": "Pending Jobs",
+          "targets": [{ "expr": "pending_jobs" }],
+          "gridPos": { "x": 6, "y": 8, "w": 6, "h": 4 }
+        },
+        {
+          "type": "stat",
+          "title": "Job Duration (sec)",
+          "targets": [{ "expr": "job_duration_seconds" }],
+          "gridPos": { "x": 12, "y": 8, "w": 6, "h": 4 }
+        },
+        {
+          "type": "timeseries",
+          "title": "Jobs Processed Over Time",
+          "targets": [{ "expr": "increase(jobs_processed_total[5m])" }],
+          "gridPos": { "x": 0, "y": 12, "w": 12, "h": 6 }
+        },
+        {
+          "type": "timeseries",
+          "title": "Documents Downloaded Over Time",
+          "targets": [{ "expr": "increase(documents_downloaded_total[5m])" }],
+          "gridPos": { "x": 12, "y": 12, "w": 12, "h": 6 }
+        },
+        {
+          "type": "timeseries",
+          "title": "Worker Retries Over Time",
+          "targets": [{ "expr": "increase(worker_retries_total[5m])" }],
+          "gridPos": { "x": 0, "y": 18, "w": 12, "h": 6 }
+        },
+        {
+          "type": "timeseries",
+          "title": "Active Workers Over Time",
+          "targets": [{ "expr": "active_workers" }],
+          "gridPos": { "x": 12, "y": 18, "w": 12, "h": 6 }
+        },
+        {
+          "type": "timeseries",
+          "title": "Job Duration Trend",
+          "targets": [{ "expr": "job_duration_seconds" }],
+          "gridPos": { "x": 0, "y": 24, "w": 12, "h": 6 }
+        },
+        {
+          "type": "timeseries",
+          "title": "Pending Jobs Trend",
+          "targets": [{ "expr": "pending_jobs" }],
+          "gridPos": { "x": 12, "y": 24, "w": 12, "h": 6 }
         }
       ]
     }
