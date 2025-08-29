@@ -130,7 +130,7 @@ Grafana dashboard (`grafana-dashboard-config.json`) includes panels for:
 
 ## 🎥 Demo Video
 
-👉 [Watch Demo Video](https://youtu.be/your-demo-link) *(replace with your link)*
+👉 [Watch Demo Video](https://youtu.be/zl7Hj5nZ7X0) 
 
 The demo shows:
 
@@ -168,5 +168,6 @@ The demo shows:
 * **Kubernetes deployment** (manifests)
 * **KEDA autoscaling** (workers scale with pending jobs)
 * **Monitoring & observability** (Prometheus, Pushgateway, Grafana)
+
 
 
