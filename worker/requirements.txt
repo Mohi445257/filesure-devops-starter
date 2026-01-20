@@ -1,6 +1,7 @@
 flask==2.3.2
 prometheus_client==0.17.1
 pymongo==4.5.0
-azure-core==1.29.4
+azure-core==1.38.0
 azure-storage-blob==12.19.1
 requests==2.31.0
+urllib3>=2.6.3 # not directly required, pinned by Snyk to avoid a vulnerability
