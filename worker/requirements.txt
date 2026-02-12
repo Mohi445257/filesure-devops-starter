@@ -4,3 +4,4 @@ pymongo==4.5.0
 azure-core==1.29.4
 azure-storage-blob==12.19.1
 requests==2.31.0
+cryptography>=46.0.5 # not directly required, pinned by Snyk to avoid a vulnerability
